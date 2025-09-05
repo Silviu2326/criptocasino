@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pwsh ./setup.ps1)",
+      "Bash(./setup.bat)",
+      "Bash(pnpm:*)",
+      "Bash(docker:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(node:*)",
+      "Bash(PORT=3002 node simple-server.js)",
+      "Bash(curl:*)",
+      "Bash(mkdir:*)",
+      "Bash(find:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,635 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  COMPLIANCE
+  AFFILIATE
+  SUPPORT
+}
+
+enum KycStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum Currency {
+  BTC
+  ETH
+  USDT
+  USDC
+  USD
+}
+
+enum Country {
+  ES
+  US
+  GB
+  CA
+  AU
+  DE
+  FR
+  IT
+  BR
+  MX
+}
+
+enum PaymentProvider {
+  COINBASE_COMMERCE
+  BTCPAY_SERVER
+  NOWPAYMENTS
+  INTERNAL_WALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  BET
+  WIN
+  BONUS
+  BONUS_WAGERING
+  AFFILIATE_COMMISSION
+}
+
+enum GameType {
+  DICE
+  COINFLIP
+  SLOTS
+}
+
+enum GameStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum BonusType {
+  WELCOME
+  DEPOSIT
+  CASHBACK
+  FREE_SPINS
+  LOYALTY
+  REFERRAL
+}
+
+enum BonusStatus {
+  ACTIVE
+  COMPLETED
+  EXPIRED
+  FORFEITED
+  CANCELLED
+}
+
+enum DocumentType {
+  PASSPORT
+  DRIVERS_LICENSE
+  NATIONAL_ID
+  PROOF_OF_ADDRESS
+  SELFIE
+}
+
+enum AmlRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  PROHIBITED
+}
+
+enum AffiliateStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  TERMINATED
+}
+
+enum CommissionType {
+  PERCENTAGE
+  FIXED
+  TIERED
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  emailVerified     Boolean   @default(false)
+  walletAddress     String?   @unique
+  walletNonce       String?
+  role              UserRole  @default(USER)
+  country           Country?
+  dateOfBirth       DateTime?
+  kycStatus         KycStatus @default(UNVERIFIED)
+  isActive          Boolean   @default(true)
+  isSuspended       Boolean   @default(false)
+  selfExcludedUntil DateTime?
+  cooldownUntil     DateTime?
+  loyaltyTier       Int       @default(1)
+  loyaltyXp         Int       @default(0)
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  sessions            Session[]
+  apiKeys             ApiKey[]
+  ledgerAccounts      LedgerAccount[]
+  ledgerEntries       LedgerEntry[]
+  transactions        Transaction[]
+  gameRounds          GameRound[]
+  seedCommits         SeedCommit[]
+  bonusGrants         BonusGrant[]
+  wageringProgress    WageringProgress[]
+  affiliateProfile    Affiliate?
+  affiliateAttribution AffiliateAttribution?
+  kycCase             KycCase?
+  kycDocuments        KycDocument[]
+  amlAlerts           AmlAlert[]
+  allowedAddresses    AllowedAddress[]
+  depositIntents      DepositIntent[]
+  withdrawalRequests  WithdrawalRequest[]
+  auditLogs           AuditLog[]  @relation("AuditLogUser")
+  adminAuditLogs      AuditLog[]  @relation("AuditLogAdmin")
+  responsibleGaming   ResponsibleGaming?
+
+  @@map("users")
+}
+
+model Session {
+  id           String    @id @default(uuid())
+  userId       String
+  accessToken  String    @unique
+  refreshToken String    @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  userId      String
+  name        String
+  key         String    @unique
+  permissions Json      @default("[]")
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+model ResponsibleGaming {
+  id                    String  @id @default(uuid())
+  userId                String  @unique
+  dailyDepositLimit     Decimal? @db.Decimal(20, 8)
+  weeklyDepositLimit    Decimal? @db.Decimal(20, 8)
+  monthlyDepositLimit   Decimal? @db.Decimal(20, 8)
+  dailyLossLimit        Decimal? @db.Decimal(20, 8)
+  weeklyLossLimit       Decimal? @db.Decimal(20, 8)
+  monthlyLossLimit      Decimal? @db.Decimal(20, 8)
+  sessionTimeLimit      Int?     // minutes
+  realityCheckInterval  Int?     // minutes
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("responsible_gaming")
+}
+
+model LedgerAccount {
+  id       String    @id @default(uuid())
+  userId   String
+  currency Currency
+  balance  Decimal   @default(0) @db.Decimal(20, 8)
+  locked   Decimal   @default(0) @db.Decimal(20, 8)
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  creditEntries LedgerEntry[]  @relation("CreditAccount")
+  debitEntries  LedgerEntry[]  @relation("DebitAccount")
+
+  @@unique([userId, currency])
+  @@map("ledger_accounts")
+}
+
+model LedgerEntry {
+  id                String      @id @default(uuid())
+  userId            String
+  transactionId     String?
+  creditAccountId   String
+  debitAccountId    String
+  amount            Decimal     @db.Decimal(20, 8)
+  description       String
+  metadata          Json?
+  createdAt         DateTime    @default(now())
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transaction   Transaction?  @relation(fields: [transactionId], references: [id])
+  creditAccount LedgerAccount @relation("CreditAccount", fields: [creditAccountId], references: [id])
+  debitAccount  LedgerAccount @relation("DebitAccount", fields: [debitAccountId], references: [id])
+
+  @@map("ledger_entries")
+}
+
+model Transaction {
+  id            String          @id @default(uuid())
+  userId        String
+  type          TransactionType
+  currency      Currency
+  amount        Decimal         @db.Decimal(20, 8)
+  balanceBefore Decimal         @db.Decimal(20, 8)
+  balanceAfter  Decimal         @db.Decimal(20, 8)
+  reference     String?
+  metadata      Json?
+  createdAt     DateTime        @default(now())
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntries LedgerEntry[]
+
+  @@map("transactions")
+}
+
+model SeedCommit {
+  id               String    @id @default(uuid())
+  userId           String?
+  serverSeed       String
+  serverSeedHash   String    @unique
+  clientSeed       String?
+  nonce            Int       @default(0)
+  isRevealed       Boolean   @default(false)
+  revealedAt       DateTime?
+  rotationReason   String?
+  createdAt        DateTime  @default(now())
+
+  user       User?       @relation(fields: [userId], references: [id])
+  gameRounds GameRound[]
+
+  @@map("seed_commits")
+}
+
+model GameRound {
+  id           String     @id @default(uuid())
+  userId       String
+  seedCommitId String
+  gameType     GameType
+  status       GameStatus @default(PENDING)
+  betAmount    Decimal    @db.Decimal(20, 8)
+  currency     Currency
+  multiplier   Decimal    @default(0) @db.Decimal(10, 4)
+  winAmount    Decimal    @default(0) @db.Decimal(20, 8)
+  result       Json
+  nonce        Int
+  createdAt    DateTime   @default(now())
+  completedAt  DateTime?
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seedCommit SeedCommit @relation(fields: [seedCommitId], references: [id])
+
+  @@map("game_rounds")
+}
+
+model DepositIntent {
+  id                     String        @id @default(uuid())
+  userId                 String
+  amount                 Decimal       @db.Decimal(20, 8)
+  currency               Currency
+  provider               PaymentProvider
+  status                 PaymentStatus @default(PENDING)
+  paymentAddress         String?
+  paymentUrl             String?
+  providerReference      String?
+  txHash                 String?
+  confirmations          Int           @default(0)
+  requiredConfirmations  Int           @default(1)
+  expiresAt              DateTime
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("deposit_intents")
+}
+
+model WithdrawalRequest {
+  id          String        @id @default(uuid())
+  userId      String
+  amount      Decimal       @db.Decimal(20, 8)
+  currency    Currency
+  address     String
+  status      PaymentStatus @default(PENDING)
+  adminNotes  String?
+  txHash      String?
+  fee         Decimal?      @db.Decimal(20, 8)
+  netAmount   Decimal?      @db.Decimal(20, 8)
+  processedBy String?
+  createdAt   DateTime      @default(now())
+  processedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("withdrawal_requests")
+}
+
+model AllowedAddress {
+  id         String   @id @default(uuid())
+  userId     String
+  currency   Currency
+  address    String
+  label      String
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, currency, address])
+  @@map("allowed_addresses")
+}
+
+model Bonus {
+  id                  String     @id @default(uuid())
+  type                BonusType
+  name                String
+  description         String
+  currency            Currency
+  amount              Decimal?   @db.Decimal(20, 8)
+  percentage          Decimal?   @db.Decimal(5, 2)
+  wageringRequirement Decimal    @db.Decimal(10, 2)
+  maxWinAmount        Decimal?   @db.Decimal(20, 8)
+  minDepositAmount    Decimal?   @db.Decimal(20, 8)
+  validForHours       Int
+  maxUses             Int?
+  currentUses         Int        @default(0)
+  isActive            Boolean    @default(true)
+  eligibleCountries   String[]   @default([])
+  excludedCountries   String[]   @default([])
+  eligibleGames       String[]   @default([])
+  termsAndConditions  String
+  promoCode           String?    @unique
+  createdAt           DateTime   @default(now())
+  validUntil          DateTime?
+
+  grants BonusGrant[]
+
+  @@map("bonuses")
+}
+
+model BonusGrant {
+  id                  String      @id @default(uuid())
+  userId              String
+  bonusId             String
+  status              BonusStatus @default(ACTIVE)
+  bonusAmount         Decimal     @db.Decimal(20, 8)
+  wageringRequirement Decimal     @db.Decimal(20, 8)
+  wageringProgress    Decimal     @default(0) @db.Decimal(20, 8)
+  maxWinAmount        Decimal?    @db.Decimal(20, 8)
+  grantedAt           DateTime    @default(now())
+  expiresAt           DateTime
+  completedAt         DateTime?
+  forfeitedAt         DateTime?
+
+  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bonus                  Bonus              @relation(fields: [bonusId], references: [id])
+  wageringProgressItems  WageringProgress[]
+
+  @@map("bonus_grants")
+}
+
+model WageringProgress {
+  id                    String   @id @default(uuid())
+  userId                String
+  bonusGrantId          String
+  gameRoundId           String
+  betAmount             Decimal  @db.Decimal(20, 8)
+  wageringContribution  Decimal  @db.Decimal(20, 8)
+  progressBefore        Decimal  @db.Decimal(20, 8)
+  progressAfter         Decimal  @db.Decimal(20, 8)
+  createdAt             DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bonusGrant BonusGrant @relation(fields: [bonusGrantId], references: [id], onDelete: Cascade)
+
+  @@map("wagering_progress")
+}
+
+model Affiliate {
+  id                String            @id @default(uuid())
+  userId            String            @unique
+  code              String            @unique
+  status            AffiliateStatus   @default(PENDING)
+  commissionType    CommissionType    @default(PERCENTAGE)
+  commissionRate    Decimal           @db.Decimal(5, 2)
+  tier              Int               @default(1)
+  totalReferrals    Int               @default(0)
+  activeReferrals   Int               @default(0)
+  totalCommission   Decimal           @default(0) @db.Decimal(20, 8)
+  pendingCommission Decimal           @default(0) @db.Decimal(20, 8)
+  paidCommission    Decimal           @default(0) @db.Decimal(20, 8)
+  lastPayoutAt      DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attributions AffiliateAttribution[]
+  commissions  AffiliateCommission[]
+  payouts      AffiliatePayout[]
+
+  @@map("affiliates")
+}
+
+model AffiliateAttribution {
+  id              String    @id @default(uuid())
+  affiliateId     String
+  userId          String    @unique
+  source          String    // CODE, LINK, COOKIE
+  attributedAt    DateTime  @default(now())
+  firstDepositAt  DateTime?
+  isActive        Boolean   @default(true)
+  totalDeposits   Decimal   @default(0) @db.Decimal(20, 8)
+  totalWagered    Decimal   @default(0) @db.Decimal(20, 8)
+  ngr             Decimal   @default(0) @db.Decimal(20, 8)
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("affiliate_attributions")
+}
+
+model AffiliateCommission {
+  id               String    @id @default(uuid())
+  affiliateId      String
+  attributionId    String
+  period           String    // YYYY-MM format
+  currency         Currency
+  ngr              Decimal   @db.Decimal(20, 8)
+  commissionRate   Decimal   @db.Decimal(5, 2)
+  commissionAmount Decimal   @db.Decimal(20, 8)
+  status           String    @default("PENDING") // PENDING, APPROVED, PAID, REJECTED
+  calculatedAt     DateTime  @default(now())
+  approvedAt       DateTime?
+  paidAt           DateTime?
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@unique([affiliateId, attributionId, period])
+  @@map("affiliate_commissions")
+}
+
+model AffiliatePayout {
+  id             String    @id @default(uuid())
+  affiliateId    String
+  period         String
+  currency       Currency
+  totalAmount    Decimal   @db.Decimal(20, 8)
+  commissions    String[]  // Commission IDs
+  status         String    @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  paymentMethod  String
+  paymentDetails Json
+  requestedAt    DateTime  @default(now())
+  processedAt    DateTime?
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@map("affiliate_payouts")
+}
+
+model KycCase {
+  id             String      @id @default(uuid())
+  userId         String      @unique
+  status         KycStatus   @default(UNVERIFIED)
+  submittedAt    DateTime?
+  reviewedAt     DateTime?
+  reviewedBy     String?
+  rejectionReason String?
+  riskLevel      AmlRiskLevel @default(LOW)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents KycDocument[]
+  notes     KycNote[]
+
+  @@map("kyc_cases")
+}
+
+model KycDocument {
+  id               String      @id @default(uuid())
+  userId           String
+  kycCaseId        String?
+  type             DocumentType
+  filename         String
+  originalName     String
+  mimeType         String
+  size             Int
+  s3Key            String
+  status           String      @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejectionReason  String?
+  uploadedAt       DateTime    @default(now())
+  reviewedAt       DateTime?
+  reviewedBy       String?
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kycCase KycCase? @relation(fields: [kycCaseId], references: [id])
+
+  @@map("kyc_documents")
+}
+
+model KycNote {
+  id        String   @id @default(uuid())
+  kycCaseId String
+  note      String
+  createdBy String
+  createdAt DateTime @default(now())
+
+  kycCase KycCase @relation(fields: [kycCaseId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_notes")
+}
+
+model AmlAlert {
+  id          String      @id @default(uuid())
+  userId      String
+  type        String
+  severity    String
+  description String
+  data        Json
+  status      String      @default("OPEN") // OPEN, INVESTIGATING, RESOLVED, FALSE_POSITIVE
+  assignedTo  String?
+  resolvedBy  String?
+  resolvedAt  DateTime?
+  resolution  String?
+  createdAt   DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("aml_alerts")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  adminId    String?
+  action     String
+  resource   String
+  resourceId String?
+  details    Json?
+  ipAddress  String
+  userAgent  String
+  createdAt  DateTime @default(now())
+
+  user  User? @relation("AuditLogUser", fields: [userId], references: [id])
+  admin User? @relation("AuditLogAdmin", fields: [adminId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  key         String   @id
+  value       String
+  type        String   // STRING, NUMBER, BOOLEAN, JSON
+  description String
+  category    String
+  isPublic    Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+  updatedBy   String
+
+  @@map("system_settings")
+}
+
+model GameConfig {
+  gameType   GameType @id
+  minBet     Json     // Currency -> amount mapping
+  maxBet     Json     // Currency -> amount mapping
+  houseEdge  Decimal  @db.Decimal(5, 4)
+  rtp        Decimal  @db.Decimal(5, 4)
+  isEnabled  Boolean  @default(true)
+  config     Json?    // Game-specific configuration
+  updatedAt  DateTime @updatedAt
+
+  @@map("game_configs")
+}
