@@ -69,7 +69,7 @@ interface AppState {
   updateBalance: (newBalance: Balance) => void
   addGameResult: (result: GameResult) => void
   setLoading: (loading: boolean) => void
-  addNotification: (notification: Notification) => void
+  addNotification: (notification: Omit<Notification, 'id'>) => void
   removeNotification: (id: string) => void
 }
 
@@ -164,7 +164,7 @@ export const useAppStore = create<AppState>()(
         set({ isLoading: loading })
       },
       
-      addNotification: (notification: Notification) => {
+      addNotification: (notification: Omit<Notification, 'id'>) => {
         const id = Math.random().toString(36).substr(2, 9)
         const newNotification = { 
           ...notification, 
