@@ -3,6 +3,5 @@
   "installCommand": "npm install -g pnpm@8.15.6 && pnpm install",
   "buildCommand": "pnpm build:web",
   "outputDirectory": "apps/web/.next",
-  "framework": "nextjs",
-  "rootDirectory": "apps/web"
+  "framework": "nextjs"
 }
