@@ -3,16 +3,19 @@ apps/api
 apps/mobile
 packages
 infra
-node_modules
 *.md
-*.js
 *.bat
 *.ps1
 Makefile
 docker-compose.yml
 pnpm-lock.yaml
 pnpm-workspace.yaml
-tsconfig.json
 vercel-build.sh
 package-vercel.json
 .vercel/project.json
+
+# Keep important config files
+!apps/web/package.json
+!apps/web/next.config.js
+!apps/web/postcss.config.js
+!apps/web/tailwind.config.js
