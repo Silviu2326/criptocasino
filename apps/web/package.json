@@ -1,5 +1,5 @@
 {
-  "name": "@crypto-casino/web",
+  "name": "crypto-casino-web",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -11,8 +11,6 @@
     "clean": "rm -rf .next"
   },
   "dependencies": {
-    "@crypto-casino/config": "workspace:*",
-    "@crypto-casino/types": "workspace:*",
     "@headlessui/react": "^1.7.17",
     "@heroicons/react": "^2.0.18",
     "@metamask/eth-sig-util": "^8.2.0",
@@ -34,7 +32,8 @@
     "recharts": "^2.8.0",
     "tailwind-merge": "^2.1.0",
     "web3modal": "^1.9.12",
-    "zustand": "^4.4.7"
+    "zustand": "^4.4.7",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/js-cookie": "^3.0.6",
