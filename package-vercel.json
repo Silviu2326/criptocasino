@@ -1,0 +1,12 @@
+{
+  "name": "crypto-casino-vercel",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd apps/web && npm run build",
+    "install": "cd apps/web && npm install --legacy-peer-deps"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
