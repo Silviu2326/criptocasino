@@ -1,7 +1,6 @@
 {
   "version": 2,
-  "installCommand": "npm install -g pnpm@8.15.6 && pnpm install",
-  "buildCommand": "pnpm build:web",
-  "outputDirectory": "apps/web/.next",
-  "framework": "nextjs"
+  "installCommand": "cd apps/web && npm install --legacy-peer-deps",
+  "buildCommand": "cd apps/web && npm run build",
+  "outputDirectory": "apps/web/.next"
 }
